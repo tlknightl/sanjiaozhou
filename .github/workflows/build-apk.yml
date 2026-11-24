@@ -11,16 +11,14 @@ on:
   workflow_dispatch:
     inputs:
       server_url:
-        description: '内置服务器地址（必填或留空读取仓库变量 DS_SERVER_URL，将编译进 APK 且对用户不可见）'
+        description: '内置服务器地址（留空则用仓库变量 DS_SERVER_URL，否则用默认值）'
         required: false
         default: ''
 
-# Needed to create/update a GitHub Release when a v* tag is pushed.
 permissions:
   contents: write
 
 env:
-  # Optional manual dispatch input or repository variable; empty is fine.
   DS_SERVER_URL: ${{ github.event.inputs.server_url || vars.DS_SERVER_URL }}
 
 concurrency:
@@ -43,24 +41,51 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # This action installs Gradle 8.7 on PATH and caches Gradle files.
-      # The repo intentionally does not commit gradle-wrapper.jar.
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      # GitHub-hosted images normally include the Android SDK, but install the
-      # exact API level used by compileSdk so the build is reproducible.
-      - name: Set up Android SDK 34
-        uses: android-actions/setup-android@v3
+      # 不使用 android-actions/setup-android（已被强制跑在 Node 24 上导致失败）
+      # 直接用 runner 预装的 Android SDK
+      - name: Configure Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            for c in /usr/local/lib/android/sdk /opt/android-sdk "$HOME/Android/Sdk"; do
+              if [ -d "$c" ]; then SDK="$c"; break; fi
+            done
+          fi
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            echo "::error::未找到 Android SDK"
+            exit 1
+          fi
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK"     >> "$GITHUB_ENV"
+          echo "SDK 路径: $SDK"
+          ls "$SDK"
 
       - name: Install Android SDK platform 34
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          SDK="$ANDROID_SDK_ROOT"
+          SM=""
+          for c in "$SDK/cmdline-tools/latest/bin/sdkmanager" \
+                   "$SDK/cmdline-tools/bin/sdkmanager"; do
+            if [ -x "$c" ]; then SM="$c"; break; fi
+          done
+          if [ -z "$SM" ]; then SM="$(command -v sdkmanager || true)"; fi
+          if [ -z "$SM" ]; then
+            echo "::notice::未找到 sdkmanager，跳过安装（镜像通常已预装 platform 34）"
+            exit 0
+          fi
+          echo "sdkmanager: $SM"
+          yes | "$SM" --licenses > /dev/null 2>&1 || true
+          "$SM" --install "platforms;android-34" "build-tools;34.0.0" || true
+          "$SM" --list_installed | sed -n '1,40p' || true
 
       - name: Check signing secrets
         id: signing
