@@ -1,0 +1,33 @@
+# Gradle build output and caches
+.gradle/
+build/
+**/build/
+captures/
+
+# Local Android SDK location (create it locally, never commit it)
+local.properties
+
+# IDE files
+.idea/
+*.iml
+*.hprof
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Signing material (must live in GitHub Secrets, never in git)
+*.jks
+*.keystore
+keystore.properties
+
+# The Gradle wrapper JAR is a binary file and is intentionally not committed.
+# Generate the wrapper locally with `gradle wrapper --gradle-version 8.7` if you
+# want to use gradlew; CI calls the Gradle installed by setup-gradle directly.
+gradle/wrapper/gradle-wrapper.jar
