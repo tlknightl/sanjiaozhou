@@ -1,0 +1,125 @@
+name: Build APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: '内置服务器地址（必填或留空读取仓库变量 DS_SERVER_URL，将编译进 APK 且对用户不可见）'
+        required: false
+        default: ''
+
+# Needed to create/update a GitHub Release when a v* tag is pushed.
+permissions:
+  contents: write
+
+env:
+  # Optional manual dispatch input or repository variable; empty is fine.
+  DS_SERVER_URL: ${{ github.event.inputs.server_url || vars.DS_SERVER_URL }}
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Assemble APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # This action installs Gradle 8.7 on PATH and caches Gradle files.
+      # The repo intentionally does not commit gradle-wrapper.jar.
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # GitHub-hosted images normally include the Android SDK, but install the
+      # exact API level used by compileSdk so the build is reproducible.
+      - name: Set up Android SDK 34
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK platform 34
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Check signing secrets
+        id: signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ] \
+            && [ -n "${ANDROID_KEYSTORE_PASSWORD:-}" ] \
+            && [ -n "${ANDROID_KEY_ALIAS:-}" ] \
+            && [ -n "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > "$RUNNER_TEMP/keystore.jks"
+            test -s "$RUNNER_TEMP/keystore.jks"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "keystore_path=$RUNNER_TEMP/keystore.jks" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets detected: signed release APK will be built."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Signing skipped::Signing secrets are incomplete. Only the debug APK will be built."
+          fi
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:assembleDebug \
+            -PserverUrl="${DS_SERVER_URL:-}" \
+            --stacktrace
+
+      - name: Build signed release APK
+        if: steps.signing.outputs.enabled == 'true'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:assembleRelease \
+            -PserverUrl="${DS_SERVER_URL:-}" \
+            --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ds-dianjing-apk
+          path: '**/*.apk'
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create GitHub Release (v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: '**/*.apk'
+          generate_release_notes: true
