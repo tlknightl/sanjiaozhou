@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Brand mark: orange arena ring with a dark lightning bolt. -->
+    <path
+        android:fillColor="@color/accent"
+        android:pathData="M60,8 C31.28,8 8,31.28 8,60 C8,88.72 31.28,112 60,112 C88.72,112 112,88.72 112,60 C112,31.28 88.72,8 60,8 Z" />
+    <path
+        android:fillColor="@color/brand_background"
+        android:pathData="M60,18 C36.8,18 18,36.8 18,60 C18,83.2 36.8,102 60,102 C83.2,102 102,83.2 102,60 C102,36.8 83.2,18 60,18 Z" />
+    <path
+        android:fillColor="@color/accent"
+        android:pathData="M66,28 L40,66 L55,66 L49,92 L82,52 L64,52 Z" />
+</vector>

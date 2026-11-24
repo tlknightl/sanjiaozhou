@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is explicitly allowed so the client can talk to a self-hosted
+  server on a LAN address such as http://192.168.1.10:8080. Use HTTPS in
+  production; user-installed CAs are intentionally not trusted globally.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

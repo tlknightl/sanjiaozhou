@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_background">#0F1115</color>
+    <color name="brand_surface">#171A21</color>
+    <color name="brand_surface_variant">#222733</color>
+    <color name="accent">#FF7A45</color>
+    <color name="accent_pressed">#E8652F</color>
+    <color name="text_primary">#F4F6FA</color>
+    <color name="text_secondary">#9AA4B2</color>
+    <color name="text_muted">#6B7280</color>
+    <color name="divider">#2A2F3A</color>
+    <color name="status_success">#34D399</color>
+    <color name="status_warning">#FBBF24</color>
+    <color name="status_error">#F87171</color>
+    <color name="overlay_button_background">#CC171A21</color>
+    <color name="transparent">#00000000</color>
+</resources>
